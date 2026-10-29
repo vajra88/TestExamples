@@ -1,0 +1,72 @@
+name: AtlaSent deploy gate demo
+
+# Run from the Actions tab ("Run workflow"), or push to main.
+# Pick a different branch in "Run workflow" to see a deny.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # GitHub environment. Must match what you link under Integrations -> GitHub.
+    environment: demo
+    permissions:
+      contents: read
+      id-token: write   # lets the gate prove this exact repo/workflow/branch via GitHub OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Ask AtlaSent: is this deploy authorized right now?
+      #    On allow it issues a single-use permit and verifies (consumes) it.
+      - name: AtlaSent gate
+        id: gate
+        uses: Atlasent/atlasent-action@v1
+        env:
+          ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+          ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+        with:
+          action: production.deploy
+          environment: test            # AtlaSent environment; the demo key is a test key
+          target-id: ${{ github.repository }}
+
+      # 2. The protected step. Runs only when the permit was verified.
+      - name: Deploy
+        if: steps.gate.outputs.verified == 'true'
+        run: ./deploy.sh
+
+      # 3. Replay check: present the same, already-used permit again.
+      #    AtlaSent must refuse it. This step is expected to fail.
+      - name: Replay the used permit (should be blocked)
+        id: replay
+        if: steps.gate.outputs.verified == 'true'
+        continue-on-error: true
+        uses: Atlasent/atlasent-action@v1
+        env:
+          ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+          ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+        with:
+          verify-permit: "true"
+          permit-token: ${{ steps.gate.outputs.permit-token }}
+          execution-hash: ${{ steps.gate.outputs.execution-hash }}
+          resolved-actor: ${{ steps.gate.outputs.resolved-actor }}
+          action: production.deploy
+          environment: test
+          target-id: ${{ github.repository }}
+
+      # 4. Show what happened, whatever the outcome.
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## AtlaSent demo result"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Decision | \`${{ steps.gate.outputs.decision }}\` |"
+            echo "| Permit verified | \`${{ steps.gate.outputs.verified }}\` |"
+            echo "| Evaluation ID | \`${{ steps.gate.outputs.evaluation-id }}\` |"
+            echo "| Deploy step | ${{ steps.gate.outputs.verified == 'true' && 'ran' || 'blocked' }} |"
+            echo "| Replay of used permit | ${{ steps.replay.outcome == 'failure' && 'blocked (correct)' || steps.replay.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
