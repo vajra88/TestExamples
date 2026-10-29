@@ -8,7 +8,7 @@ The workflow is `.github/workflows/atlasent-demo.yml`.
 
 | Run | Expected result |
 |---|---|
-| **Run workflow** on `main` | `allow`: permit issued and verified, the Deploy step runs, and reusing the permit is blocked |
+| **Run workflow** on `main` | `hold` until you approve it in the AtlaSent console, then `allow`: permit issued and verified, the Deploy step runs, and reusing the permit is blocked |
 | **Run workflow** on any other branch | `deny` (`ACTOR_UNVERIFIED`): that branch isn't linked in AtlaSent, so the Deploy step never runs |
 
 Each run writes a summary table on the run page, and every decision appears
@@ -29,4 +29,4 @@ In the AtlaSent console, under Integrations → GitHub, link:
 - Workflow file: `.github/workflows/atlasent-demo.yml`
 - Branch: `main`
 - GitHub environment: `demo`
-- AtlaSent environment: `test`
+- AtlaSent environment: `staging`

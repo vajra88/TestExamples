@@ -26,10 +26,15 @@ jobs:
         env:
           ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
           ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           action: production.deploy
-          environment: test            # AtlaSent environment; the demo key is a test key
+          environment: staging         # AtlaSent environment; must match the console link
           target-id: ${{ github.repository }}
+          # production.deploy needs a human approval in this org: pause until
+          # someone approves (or rejects) it in the AtlaSent console.
+          wait-for-approval: "true"
+          max-wait-minutes: 15
 
       # 2. The protected step. Runs only when the permit was verified.
       - name: Deploy
@@ -52,7 +57,7 @@ jobs:
           execution-hash: ${{ steps.gate.outputs.execution-hash }}
           resolved-actor: ${{ steps.gate.outputs.resolved-actor }}
           action: production.deploy
-          environment: test
+          environment: staging
           target-id: ${{ github.repository }}
 
       # 4. Show what happened, whatever the outcome.
